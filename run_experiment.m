@@ -14,6 +14,11 @@ function results = run_experiment(config)
 %   3. Three blocks (random order), one for each standard tone
 %   4. Each block has baseline trials followed by mixed trials
 %
+% IMPORTANT CONSTRAINT:
+%   At least 5 standard trials must occur between any two deviant trials
+%   (deviants or omissions). The function will error if trials_per_block
+%   is too small to satisfy this constraint.
+%
 % Output:
 %   results - Structure containing all trial data and timestamps
 %
@@ -183,23 +188,86 @@ function block_results = run_block(block_num, standard_idx, deviant_indices, ton
     n_deviants_per_type = round(n_deviants / 2);  % Split equally between two deviant types
     n_standards = trials_after_baseline - n_omissions - (n_deviants_per_type * 2);
 
-    % Create trial sequence for non-baseline trials
-    trial_sequence = [];
+    % Total non-standard trials (deviants + omissions)
+    n_non_standards = n_omissions + (n_deviants_per_type * 2);
 
-    % Add standard trials (using standard_idx)
-    trial_sequence = [trial_sequence; repmat(standard_idx, n_standards, 1)];
+    % Constraint: At least 5 standard trials between any two non-standards (deviants or omissions)
+    min_spacing = 5;
 
-    % Add deviant trials
-    trial_sequence = [trial_sequence; repmat(deviant_indices(1), n_deviants_per_type, 1)];
-    trial_sequence = [trial_sequence; repmat(deviant_indices(2), n_deviants_per_type, 1)];
+    % Calculate minimum trials needed to satisfy constraint
+    % Formula: N non-standards + (N-1) * min_spacing standards between them
+    if n_non_standards > 0
+        min_trials_needed = n_non_standards + (n_non_standards - 1) * min_spacing;
+    else
+        min_trials_needed = 0;
+    end
 
-    % Add omission trials (represented by 0)
-    trial_sequence = [trial_sequence; zeros(n_omissions, 1)];
+    % Check if we have enough trials
+    if trials_after_baseline < min_trials_needed
+        min_total_trials = config.baseline_trials + min_trials_needed;
+        error(['Not enough trials to maintain minimum spacing of %d standard trials between deviants.\n' ...
+               'Current configuration:\n' ...
+               '  Trials per block: %d\n' ...
+               '  Baseline trials: %d\n' ...
+               '  Trials after baseline: %d\n' ...
+               '  Non-standard trials (deviants + omissions): %d\n' ...
+               '  Minimum trials after baseline needed: %d\n' ...
+               '  MINIMUM TOTAL TRIALS NEEDED: %d\n\n' ...
+               'Please increase trials_per_block to at least %d in experiment_config.m'], ...
+               min_spacing, config.trials_per_block, config.baseline_trials, ...
+               trials_after_baseline, n_non_standards, min_trials_needed, ...
+               min_total_trials, min_total_trials);
+    end
 
-    % Randomize the non-baseline sequence
-    trial_sequence = trial_sequence(randperm(length(trial_sequence)));
+    % Generate trial sequence with spacing constraint
+    % Start with all standards
+    trial_sequence = repmat(standard_idx, trials_after_baseline, 1);
 
-    % Combine baseline and randomized sequence
+    % Create list of non-standard trials to place
+    non_standard_trials = [];
+    non_standard_trials = [non_standard_trials; repmat(deviant_indices(1), n_deviants_per_type, 1)];
+    non_standard_trials = [non_standard_trials; repmat(deviant_indices(2), n_deviants_per_type, 1)];
+    non_standard_trials = [non_standard_trials; zeros(n_omissions, 1)];
+
+    % Randomize the non-standard trials
+    non_standard_trials = non_standard_trials(randperm(length(non_standard_trials)));
+
+    % Generate valid positions for non-standards (at least min_spacing apart)
+    valid_positions = [];
+    pos = 1;  % Start from position 1 (first trial after baseline)
+    while pos <= trials_after_baseline && length(valid_positions) < n_non_standards
+        valid_positions = [valid_positions; pos];
+        pos = pos + min_spacing + 1;  % Move to next valid position
+    end
+
+    % If we have more valid positions than needed, randomly select subset
+    if length(valid_positions) > n_non_standards
+        % Calculate maximum spread for non-standards
+        max_spread = trials_after_baseline - (n_non_standards - 1) * (min_spacing + 1);
+
+        % Randomly distribute non-standards across valid range
+        selected_positions = [];
+        for i = 1:n_non_standards
+            if i == 1
+                % First non-standard can be anywhere from position 1 to max_spread
+                pos = randi([1, max(1, max_spread)]);
+            else
+                % Each subsequent non-standard must be at least min_spacing+1 after previous
+                min_pos = selected_positions(i-1) + min_spacing + 1;
+                max_pos = min(trials_after_baseline, min_pos + max_spread);
+                pos = randi([min_pos, max_pos]);
+            end
+            selected_positions = [selected_positions; pos];
+        end
+        valid_positions = selected_positions;
+    end
+
+    % Place non-standards at selected positions
+    for i = 1:length(non_standard_trials)
+        trial_sequence(valid_positions(i)) = non_standard_trials(i);
+    end
+
+    % Combine baseline and constrained sequence
     full_sequence = [baseline_sequence; trial_sequence];
 
     %% Execute trials

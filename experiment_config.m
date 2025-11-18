@@ -13,6 +13,12 @@ function config = experiment_config()
 %   - Deviant:  One of the other two tones (oddball)
 %   - Omission: No tone played (silence)
 %
+% IMPORTANT CONSTRAINT:
+%   At least 5 standard trials must occur between any two deviant trials
+%   (deviants or omissions). This ensures the standard tone is well-established
+%   before each deviant. The configuration will error if trials_per_block is
+%   too small to satisfy this constraint.
+%
 % Usage:
 %   config = experiment_config();
 %   run_experiment(config);
@@ -100,6 +106,35 @@ function config = experiment_config()
     config.expected_standard_count = round((100 - total_percentage) / 100 * trials_after_baseline) + config.baseline_trials;
     config.expected_omission_count = round(config.omission_percentage / 100 * trials_after_baseline);
     config.expected_deviant_count = round(config.deviant_percentage / 100 * trials_after_baseline);
+
+    % Validate spacing constraint: at least 5 standard trials between deviants
+    % This ensures the standard tone is well-established before each deviant
+    min_spacing = 5;
+    n_omissions = config.expected_omission_count;
+    n_deviants_total = config.expected_deviant_count;
+    n_non_standards = n_omissions + n_deviants_total;
+
+    % Minimum trials needed: N non-standards + (N-1) * 5 standards between them
+    if n_non_standards > 0
+        min_trials_after_baseline = n_non_standards + (n_non_standards - 1) * min_spacing;
+
+        if trials_after_baseline < min_trials_after_baseline
+            min_total_trials = config.baseline_trials + min_trials_after_baseline;
+            error(['CONFIGURATION ERROR: Not enough trials to maintain minimum spacing.\n' ...
+                   'CONSTRAINT: At least %d standard trials must occur between any two deviants (including omissions).\n\n' ...
+                   'Current configuration:\n' ...
+                   '  Trials per block: %d\n' ...
+                   '  Baseline trials: %d\n' ...
+                   '  Trials after baseline: %d\n' ...
+                   '  Expected non-standard trials: %d\n' ...
+                   '  Minimum trials after baseline needed: %d\n\n' ...
+                   'SOLUTION: Increase trials_per_block to at least %d\n' ...
+                   '          (or reduce omission_percentage and/or deviant_percentage)'], ...
+                   min_spacing, config.trials_per_block, config.baseline_trials, ...
+                   trials_after_baseline, n_non_standards, min_trials_after_baseline, ...
+                   min_total_trials);
+        end
+    end
 
     %% ===== DISPLAY CONFIGURATION SUMMARY =====
 
