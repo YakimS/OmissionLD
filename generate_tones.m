@@ -8,8 +8,9 @@ function generate_tones()
 %
 % All tones are:
 %   - Duration: 50 ms
-%   - Intensity: 75 dB SPL (calibrated to reference)
+%   - Amplitude: Normalized to [-1, 1] range
 %   - Sample rate: 44100 Hz
+%   - NOTE: Amplitude should be adjusted manually per subject's preference
 %
 % Output files:
 %   - tone_low_650Hz.wav
@@ -19,7 +20,6 @@ function generate_tones()
     % Define parameters
     sample_rate = 44100;  % Hz
     duration = 0.050;      % 50 ms
-    target_db = 75;        % dB SPL
 
     % Frequency definitions
     frequencies = [650, 1428, 3137];  % Hz
@@ -64,23 +64,15 @@ function generate_tones()
         % Apply envelope
         tone = tone .* envelope;
 
-        % Normalize to target dB SPL
-        % Reference: 0 dB SPL corresponds to amplitude of 1
-        % 75 dB SPL = 20*log10(amplitude/reference)
-        % amplitude = 10^(dB/20) * reference
-        reference_amplitude = 0.00002;  % Standard reference for sound pressure
-        target_amplitude = 10^(target_db/20) * reference_amplitude;
-
-        % Scale to appropriate range for WAV file (normalized to prevent clipping)
-        % For 75 dB, we'll use a normalized approach
-        tone = tone / max(abs(tone));  % Normalize to [-1, 1]
-        tone = tone * 0.3;  % Scale to safe playback level (adjust based on your system)
+        % Normalize to [-1, 1] range to prevent clipping
+        % Amplitude will be adjusted manually per subject's preference during experiment
+        tone = tone / max(abs(tone));
 
         % Save to WAV file
         filename = fullfile(output_dir, sprintf('tone_%s.wav', tone_names{i}));
         audiowrite(filename, tone, sample_rate);
 
-        fprintf('Generated: %s (%d Hz, 50 ms, 75 dB)\n', filename, freq);
+        fprintf('Generated: %s (%d Hz, 50 ms)\n', filename, freq);
     end
 
     fprintf('=====================================\n');
