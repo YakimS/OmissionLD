@@ -7,8 +7,15 @@ clear; close all; clc;
 addpath 'D:\matlab_libs\eeglab2025.1.0'
 eeglab nogui;
 
-PREPROCESSED_DIR = 'D:\omissionPilot\preprocessed';
-ROI_CHANNELS = {'E15', 'E14', 'E22', 'E6', 'E7', 'E16','E23'};
+PREPROCESSED_DIR = 'D:\omissionPilot\preprocessed\gel';
+ROI_CHANNELS_central_GEL = {'E106', 'E7', 'E80', 'E55', 'E31'};  % 128-channel
+ROI_CHANNELS_central_SALINE = {'E15', 'E14', 'E22', 'E6', 'E7', 'E16', 'E23'};  % 256-channel
+ROI_CHANNELS_frontal_GEL = {'E106', 'E7', 'E80', 'E55', 'E31'};  % 128-channel
+ROI_CHANNELS_frontal_SALINE = {'E15', 'E14', 'E22', 'E6', 'E7', 'E16', 'E23'};  % 256-channel
+
+
+
+ROI_CHANNELS = ROI_CHANNELS_central_GEL;
 
 
 set_files = dir(fullfile(PREPROCESSED_DIR, '*_preprocessed.set'));

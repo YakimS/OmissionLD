@@ -4,14 +4,33 @@
 
 clear; close all; clc;
 
+%% ============= DATA TYPE SELECTION =============
+% Choose which data to analyze: 'gel', 'saline', or 'both'
+DATA_TYPE = 'both';  % Options: 'gel', 'saline', 'both'
+
 addpath 'D:\matlab_libs\eeglab2025.1.0'
 eeglab nogui;
 
-PREPROCESSED_DIR = 'D:\omissionPilot\preprocessed';
-OUTPUT_DIR = 'D:\omissionPilot\figures';
-% central {'E9', 'E186', 'E45', 'E81', 'E132', 'E257'}
-% frontal {'E9', 'E186', 'E45', 'E81', 'E132', 'E257'}
-ROI_CHANNELS = {'E15', 'E14', 'E22', 'E6', 'E7', 'E16','E23'};
+PREPROCESSED_BASE = 'D:\omissionPilot\preprocessed';
+OUTPUT_BASE = 'D:\omissionPilot\figures';
+
+% Configure data types to process
+if strcmp(DATA_TYPE, 'both')
+    data_types = {'gel', 'saline'};
+elseif strcmp(DATA_TYPE, 'gel')
+    data_types = {'gel'};
+elseif strcmp(DATA_TYPE, 'saline')
+    data_types = {'saline'};
+else
+    error('Invalid DATA_TYPE: %s. Must be ''gel'', ''saline'', or ''both''', DATA_TYPE);
+end
+
+% Electrode sets per data type
+ELECTRODES.gel.central = {'E106', 'E7', 'E80', 'E55', 'E31'};
+ELECTRODES.gel.frontal = {'E4', 'E5', 'E10', 'E11', 'E12', 'E16', 'E18', 'E19'};
+ELECTRODES.saline.central = {'E9', 'E186', 'E45', 'E81', 'E132', 'E257'};
+ELECTRODES.saline.frontal = {'E6', 'E7', 'E14', 'E15', 'E16', 'E22', 'E23'};
+ELECTRODE_SETS = {'central', 'frontal'};
 
 % Set default white background and black text for all figures
 set(0, 'DefaultFigureColor', 'w');
@@ -28,18 +47,33 @@ COLOR_STD = [0.2 0.6 0.2];       % green - SNGL_STD
 COLOR_OMI250 = [0.8 0.2 0.2];   % red - DBL250_OMI
 COLOR_OMI100 = [0.2 0.2 0.8];   % blue - DBL100_OMI
 
-if ~exist(OUTPUT_DIR, 'dir')
-    mkdir(OUTPUT_DIR);
-end
+%% Process each data type
+for dt = 1:length(data_types)
+    current_type = data_types{dt};
+    PREPROCESSED_DIR = fullfile(PREPROCESSED_BASE, current_type);
+    OUTPUT_DIR = fullfile(OUTPUT_BASE, current_type);
 
-set_files = dir(fullfile(PREPROCESSED_DIR, '*_preprocessed.set'));
-n_files = length(set_files);
+    if ~exist(OUTPUT_DIR, 'dir')
+        mkdir(OUTPUT_DIR);
+    end
 
-% Storage for grand average
-all_erp_std = [];
-all_erp_omi250 = [];
-all_erp_omi100 = [];
-times = [];
+    set_files = dir(fullfile(PREPROCESSED_DIR, '*_preprocessed.set'));
+    n_files = length(set_files);
+
+    if n_files == 0
+        continue;
+    end
+
+%% Process each electrode set
+for es = 1:length(ELECTRODE_SETS)
+    current_elec_set = ELECTRODE_SETS{es};
+    ROI_CHANNELS = ELECTRODES.(current_type).(current_elec_set);
+
+    % Storage for grand average
+    all_erp_std = [];
+    all_erp_omi250 = [];
+    all_erp_omi100 = [];
+    times = [];
 
 %% Individual subject plots
 figure('Position', [100 100 1200 300*n_files], 'Color', 'w');
@@ -54,7 +88,7 @@ for f = 1:n_files
         times = EEG.times;
     end
 
-    % Find central channels
+    % Find channels
     chan_idx = find(ismember({EEG.chanlocs.labels}, ROI_CHANNELS));
 
     % Get epoch indices for each condition
@@ -104,9 +138,9 @@ for f = 1:n_files
     hold off;
 end
 
-sgtitle('Omission Response - Individual Subjects', 'FontSize', 14, 'FontWeight', 'bold');
+sgtitle(sprintf('Omission Response - Individual Subjects (%s)', current_elec_set), 'FontSize', 14, 'FontWeight', 'bold');
 
-saveas(gcf, fullfile(OUTPUT_DIR, 'omission_response_individual.png'));
+saveas(gcf, fullfile(OUTPUT_DIR, ['omission_response_individual_' current_elec_set '.png']));
 
 %% Grand average across subjects
 figure('Position', [100 100 800 600], 'Color', 'w');
@@ -155,8 +189,10 @@ title(sprintf('Grand Average Omission Response (N=%d subjects)', n_files));
 legend([h1, h2, h3], {'SNGL\_STD', 'DBL250\_OMI', 'DBL100\_OMI'}, 'Location', 'best');
 hold off;
 
-sgtitle('Omission Response - Grand Average', 'FontSize', 14, 'FontWeight', 'bold');
+sgtitle(sprintf('Omission Response - Grand Average (%s)', current_elec_set), 'FontSize', 14, 'FontWeight', 'bold');
 
-saveas(gcf, fullfile(OUTPUT_DIR, 'omission_response_grand_average.png'));
+saveas(gcf, fullfile(OUTPUT_DIR, ['omission_response_grand_average_' current_elec_set '.png']));
 
-fprintf('Figures saved to %s\n', OUTPUT_DIR);
+end  % end electrode_sets loop
+
+end  % end data_types loop

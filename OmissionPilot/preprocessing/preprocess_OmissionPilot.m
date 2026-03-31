@@ -15,10 +15,14 @@ clear all;
 close all;
 clc;
 
+%% ============= DATA TYPE SELECTION =============
+% Choose which data to process: 'gel', 'saline', or 'both'
+DATA_TYPE = 'both';  % Options: 'gel', 'saline', 'both'
+
 %% ============= PATHS =============
 restoredefaultpath
 addpath 'D:\matlab_libs\eeglab2025.1.0'
-eeglab %nogui;
+eeglab nogui;
 
 if ~exist('pop_mffimport', 'file')
     plugin_askinstall('mffmatlabio', 'pop_mffimport', true);
@@ -30,15 +34,27 @@ if ~exist('pop_iclabel', 'file')
     plugin_askinstall('ICLabel', 'pop_iclabel', true);
 end
 
-RAW_DATA_DIR = 'D:\omissionPilot\raw_data';
-OUTPUT_DIR = 'D:\omissionPilot\preprocessed';
+% Base directories
+RAW_DATA_BASE = 'D:\omissionPilot\raw_data';
+OUTPUT_BASE = 'D:\omissionPilot\preprocessed';
+
+% Configure data types to process
+if strcmp(DATA_TYPE, 'both')
+    data_types = {'gel', 'saline'};
+elseif strcmp(DATA_TYPE, 'gel')
+    data_types = {'gel'};
+elseif strcmp(DATA_TYPE, 'saline')
+    data_types = {'saline'};
+else
+    error('Invalid DATA_TYPE: %s. Must be ''gel'', ''saline'', or ''both''', DATA_TYPE);
+end
 
 %% ============= PARAMETERS =============
 % Event filter - only process events where CNAM contains this string
 CNAM_FILTER = 'ITI1200ms';
 
 % Processing control flags
-FORCE_REPROCESS = true;  % Set to true to reprocess even if output exists
+FORCE_REPROCESS = false;  % Set to true to reprocess even if output exists
 
 % Filtering parameters
 HIGHPASS_FREQ = 0.1;
@@ -67,12 +83,21 @@ CONDITION_EVENTS = {'SNGL_STD', 'SNGL_OMI', 'SNGL_DEV', ...
                     'DBL250_STD', 'DBL250_OMI', 'DBL250_DEV'};
 
 
-%%
-if ~exist(OUTPUT_DIR, 'dir')
-    mkdir(OUTPUT_DIR);
-end
+%% Process each data type
+for dt = 1:length(data_types)
+    current_type = data_types{dt};
+    RAW_DATA_DIR = fullfile(RAW_DATA_BASE, current_type);
+    OUTPUT_DIR = fullfile(OUTPUT_BASE, current_type);
 
-mff_files = dir(fullfile(RAW_DATA_DIR, '*.mff'));
+    if ~exist(OUTPUT_DIR, 'dir')
+        mkdir(OUTPUT_DIR);
+    end
+
+    mff_files = dir(fullfile(RAW_DATA_DIR, '*.mff'));
+
+    if isempty(mff_files)
+        continue;
+    end
 
 %% Process each file
 for f = 1:length(mff_files)
@@ -170,7 +195,7 @@ for f = 1:length(mff_files)
         save(fullfile(OUTPUT_DIR, [basename '_stage1_summary.mat']), 'stage1_summary');
     end
 
-    %% ============= STAGE 2: Bad channel detection, interpolation, re-reference, epoch, artifact rejection =============
+    % ============= STAGE 2: Bad channel detection, interpolation, re-reference, epoch, artifact rejection =============
     fprintf('--- Stage 2: Bad channel detection, interpolation, epoching, artifact rejection ---\n');
 
     % Lean channel rejection (variance, correlation, kurtosis-based)
@@ -307,6 +332,8 @@ for f = 1:length(mff_files)
     write_preprocessing_summary(summary_path, summary, CONDITION_EVENTS);
     fprintf('Wrote preprocessing summary to %s\n', summary_filename);
 end
+
+end  % end data_types loop
 
 %% Helper function: Filter events to keep only those with CNAM containing filter string
 function EEG = filter_events_by_cnam(EEG, cnam_filter)

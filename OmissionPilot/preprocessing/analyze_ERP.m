@@ -7,13 +7,35 @@ clear all;
 close all;
 clc;
 
+%% ============= DATA TYPE SELECTION =============
+% Choose which data to analyze: 'gel', 'saline', or 'both'
+DATA_TYPE = 'both';  % Options: 'gel', 'saline', 'both'
+
 %% ============= PATHS =============
 restoredefaultpath
 addpath 'D:\matlab_libs\eeglab2025.1.0'
 eeglab nogui;
 
-PREPROCESSED_DIR = 'D:\omissionPilot\preprocessed';
-OUTPUT_DIR = 'D:\omissionPilot\figures';
+PREPROCESSED_BASE = 'D:\omissionPilot\preprocessed';
+OUTPUT_BASE = 'D:\omissionPilot\figures';
+
+% Configure data types to process
+if strcmp(DATA_TYPE, 'both')
+    data_types = {'gel', 'saline'};
+elseif strcmp(DATA_TYPE, 'gel')
+    data_types = {'gel'};
+elseif strcmp(DATA_TYPE, 'saline')
+    data_types = {'saline'};
+else
+    error('Invalid DATA_TYPE: %s. Must be ''gel'', ''saline'', or ''both''', DATA_TYPE);
+end
+
+% Electrode sets per data type
+ELECTRODES.gel.central = {'E106', 'E7', 'E80', 'E55', 'E31'};
+ELECTRODES.gel.frontal = {'E4', 'E5', 'E10', 'E11', 'E12', 'E16', 'E18', 'E19'};
+ELECTRODES.saline.central = {'E9', 'E186', 'E45', 'E81', 'E132', 'E257'};
+ELECTRODES.saline.frontal = {'E6', 'E7', 'E14', 'E15', 'E16', 'E22', 'E23'};
+ELECTRODE_SETS = {'central', 'frontal'};
 
 %% ============= PARAMETERS =============
 % Set default white background and black text for all figures
@@ -26,8 +48,6 @@ set(0, 'DefaultAxesTickLabelInterpreter', 'none');
 set(0, 'DefaultLegendInterpreter', 'none');
 set(0, 'DefaultColorbarTickLabelInterpreter', 'none');
 
-CENTRAL_CHANNELS = {'E9', 'E186', 'E45', 'E81', 'E132', 'E257'};
-
 % Conditions
 CONDITIONS = {'SNGL_STD', 'SNGL_OMI', 'SNGL_DEV', ...
               'DBL100_STD', 'DBL100_OMI', 'DBL100_DEV', ...
@@ -38,12 +58,25 @@ COLORS.standard = [0.2 0.6 0.2];   % green
 COLORS.omission = [0.8 0.2 0.2];   % red
 COLORS.deviant  = [0.2 0.2 0.8];   % blue
 
-%%
-if ~exist(OUTPUT_DIR, 'dir')
-    mkdir(OUTPUT_DIR);
-end
+%% Process each data type
+for dt = 1:length(data_types)
+    current_type = data_types{dt};
+    PREPROCESSED_DIR = fullfile(PREPROCESSED_BASE, current_type);
+    OUTPUT_DIR = fullfile(OUTPUT_BASE, current_type);
 
-set_files = dir(fullfile(PREPROCESSED_DIR, '*_preprocessed.set'));
+    if ~exist(OUTPUT_DIR, 'dir')
+        mkdir(OUTPUT_DIR);
+    end
+
+    set_files = dir(fullfile(PREPROCESSED_DIR, '*_preprocessed.set'));
+    if isempty(set_files)
+        continue;
+    end
+
+%% Process each electrode set
+for es = 1:length(ELECTRODE_SETS)
+    current_elec_set = ELECTRODE_SETS{es};
+    CHANNELS = ELECTRODES.(current_type).(current_elec_set);
 
 %% Process each file
 for f = 1:length(set_files)
@@ -54,12 +87,12 @@ for f = 1:length(set_files)
     [~, basename, ~] = fileparts(filename);
     basename = strrep(basename, '_preprocessed', '');
 
-    % Find central channel indices
+    % Find channel indices
     chan_idx = [];
     if isfield(EEG.chanlocs, 'labels')
         all_labels = {EEG.chanlocs.labels};
-        for c = 1:length(CENTRAL_CHANNELS)
-            idx = find(strcmpi(all_labels, CENTRAL_CHANNELS{c}));
+        for c = 1:length(CHANNELS)
+            idx = find(strcmpi(all_labels, CHANNELS{c}));
             if ~isempty(idx)
                 chan_idx = [chan_idx, idx(1)];
             end
@@ -119,7 +152,7 @@ for f = 1:length(set_files)
     y_min = min(all_vals);
     y_max = max(all_vals);
     y_margin = (y_max - y_min) * 0;
-    Y_LIMITS = [-3,3];%[y_min - y_margin, y_max + y_margin];
+    Y_LIMITS = [-7,7];%[y_min - y_margin, y_max + y_margin];
 
     % 3x3 grid - rows=ISI type, cols=trial type
     figure('Position', [100 100 1000 800], 'Color', 'w');
@@ -177,9 +210,13 @@ for f = 1:length(set_files)
         end
     end
 
-    sgtitle(sprintf('%s - ERP by Condition', basename), 'Interpreter', 'none', 'FontSize', 12);
+    sgtitle(sprintf('%s - ERP by Condition (%s)', basename, current_elec_set), 'Interpreter', 'none', 'FontSize', 12);
 
-    saveas(gcf, fullfile(OUTPUT_DIR, [basename '_ERP_grid.png']));
+    saveas(gcf, fullfile(OUTPUT_DIR, [basename '_ERP_grid_' current_elec_set '.png']));
 
     close all;
 end
+
+end  % end electrode_sets loop
+
+end  % end data_types loop

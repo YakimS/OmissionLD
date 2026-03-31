@@ -15,9 +15,21 @@ preprocess_OmissionPilot  % Processes all .mff files in RAW_DATA_DIR
 
 ## Data Paths
 
-- EEGLAB: `D:\matlab_libs\eeglab2024.2`
-- Raw MFF files: `D:\omissionPilot\raw_data`
-- Output: `D:\omissionPilot\preprocessed`
+- EEGLAB: `D:\matlab_libs\eeglab2025.1.0`
+- Raw MFF files: `D:\omissionPilot\raw_data\gel` (128-channel) and `D:\omissionPilot\raw_data\saline` (256-channel)
+- Output: `D:\omissionPilot\preprocessed\gel` and `D:\omissionPilot\preprocessed\saline`
+
+## Data Type Selection
+
+All scripts support a `DATA_TYPE` flag: `'gel'`, `'saline'`, or `'both'`
+
+Electrode sets per data type:
+- **Gel (128-channel)**:
+  - Central: E106, E7, E80, E55, E31
+  - Frontal: E4, E5, E10, E11, E12, E16, E18, E19
+- **Saline (256-channel)**:
+  - Central: E9, E186, E45, E81, E132, E257
+  - Frontal: E6, E7, E14, E15, E16, E22, E23
 
 ## Pipeline Steps
 
